@@ -1,0 +1,257 @@
+import pygame
+
+import random
+
+
+class Vec2d:
+
+    def __init__(self, x, y):
+        # Create a vector at the beginning x and end y of a directed segment,
+        # x, y isinstance Vec2d.  
+        if isinstance(x, Vec2d) and isinstance(y, Vec2d):
+            create_vector = y - x
+            self.x = create_vector.x
+            self.y = create_vector.y
+        # Vector created by coordinates: x, y isinstance int or floor.  
+        else:
+            self.x = x
+            self.y = y
+
+    def __add__(self, other):
+        return Vec2d(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other):
+        return Vec2d(self.x - other.x, self.y - other.y)
+
+    def __mul__(self, other):
+        if isinstance(other, Vec2d):
+            return self.x*other.x + self.y*other.y
+        return Vec2d(self.x*other, self.y*other)
+
+    def __len__(self):
+        return (self.x**2 + self.y**2)**0.5
+
+    def int_pair(self):
+        return int(self.x), int(self.y)
+
+
+class Polyline:
+
+    def __init__(self, Display):
+        self.points = []
+        self.speeds = []
+        self.Display = Display
+
+    def append(self, point, speed):
+        self.points.append(point)
+        self.speeds.append(speed)
+
+    def delete(self):
+        if len(self.points) != 0:
+            self.points.pop()
+            self.speeds.pop()
+        pass
+
+    def set_points(self):
+        for p in range(len(self.points)):
+            self.points[p] += self.speeds[p]
+            if self.points[p].x > SCREEN_DIM[0] or self.points[p].x < 0:
+                self.speeds[p] = Vec2d(-self.speeds[p].x, self.speeds[p].y)
+            if self.points[p].y > SCREEN_DIM[1] or self.points[p].y < 0:
+                self.speeds[p] = Vec2d(self.speeds[p].x, -self.speeds[p].y)
+
+    def draw_points(self, points, width=3, color=(255, 255, 255)):
+        for p in points:
+            pygame.draw.circle(self.Display, color, p.int_pair(), width)
+
+    def driver(self, command):
+        for i in range(len(self.speeds)):
+            if command == 'faster':
+                self.speeds[i] *= 2
+            elif command == 'slower':
+                self.speeds[i] *= 0.5
+
+
+class Knot(Polyline):
+
+    def __init__(self, Display, count):
+        super().__init__(Display)
+        self.count = count
+
+    def append(self, point, speed):
+        super().append(point, speed)
+        self.get_knot()
+
+    def delete(self):
+        super().delete()
+        self.get_knot()
+
+    def set_points(self):
+        super().set_points()
+        self.get_knot()
+
+    def get_point(self, points, alpha, deg=None):
+        if deg is None:
+            deg = len(points) - 1
+        if deg == 0:
+            return points[0]
+        return(points[deg]*alpha + 
+                self.get_point(points, alpha, deg-1) * (1-alpha))
+
+    def get_points(self, base_points):
+        alpha = 1 / self.count
+        res = []
+        for i in range(self.count):
+            res.append(self.get_point(base_points, i*alpha))
+        return res
+
+    def get_knot(self):
+        if len(self.points) < 3:
+            return []
+        res = []
+        for i in range(-2, len(self.points) -2):
+            ptn = []
+            ptn.append((self.points[i]+self.points[i+1]) * 0.5)
+            ptn.append(self.points[i+1])
+            ptn.append((self.points[i+1]+self.points[i+2]) * 0.5)
+            res.extend(self.get_points(ptn))
+        return res
+
+    def draw_points(self, points, width=3, color=(255, 255, 255)):
+        for p_n in range(-1, len(points) -1):
+            pygame.draw.line(self.Display, color, points[p_n].int_pair(),
+                            points[p_n+1].int_pair(), width)
+
+
+class PygameWindow:
+
+    def __init__(self):
+        # Initializes Pygame itself.  
+        self.color = pygame.Color(0)
+        self.working = True
+        self.steps = 35
+        self.show_help = False
+        self.pause = True
+        self.hue = 0
+        # To work with multiple curves at once.  
+        self.lines = [
+            [Polyline(gameDisplay), Knot(gameDisplay, self.steps)]
+            ]
+        self.n = 0
+        self.flag = False
+
+    def run(self):
+        # Performs the main loop. It runs until the
+        # self.working element is set to False.  
+        while self.working:
+            self._handle_events()
+            gameDisplay.fill((0, 0, 0))
+            self.hue = (self.hue + 1) % 360
+            self.color.hsla = (self.hue, 100, 50, 100)
+            for i in range(self.n+1):
+                self.lines[i][1].draw_points(
+                    self.lines[i][1].get_knot(), 3, self.color)
+                self.lines[i][0].draw_points(self.lines[i][0].points)
+                if not self.pause:
+                    self.lines[i][1].set_points()
+                    self.lines[i][0].set_points()
+                if self.show_help:
+                    self._draw_help()
+            pygame.display.flip()
+        pygame.display.quit()
+        pygame.quit()
+
+    def _handle_events(self):
+        # Listens for events generated by Pygame, such as key and mouse
+        # events. For each event, it calls all the handler functions
+        # that must handle events of the appropriate types.  
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.working = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.working = False
+                if event.key == pygame.K_r:
+                    self.lines = [
+                        [Polyline(gameDisplay), Knot(gameDisplay, self.steps)]
+                        ]
+                    self.n = 0
+                    self.flag = False
+                if event.key == pygame.K_p:
+                    self.pause = not self.pause
+                if event.key == pygame.K_1:
+                    self.steps += 1
+                    self.flag = True
+                if event.key == pygame.K_TAB:
+                    self.show_help = not self.show_help
+                if event.key == pygame.K_0:
+                    self.steps -= 1 if self.steps > 1 else 0
+                    for i in range(self.n+1):
+                        self.lines[i][0].delete()
+                        self.lines[i][1].delete()
+                if event.key == pygame.K_w:
+                    for i in range(self.n+1):
+                        self.lines[i][0].driver('faster')
+                        self.lines[i][1].driver('faster')
+                if event.key == pygame.K_s:
+                    for i in range(self.n+1):
+                        self.lines[i][0].driver('slower')
+                        self.lines[i][1].driver('slower')
+                if event.key == pygame.K_SPACE:
+                    self.lines.append(
+                        [Polyline(gameDisplay), Knot(gameDisplay, self.steps)]
+                        )
+                    self.n += 1
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.flag:
+                    for i in range(self.n+1):
+                        self.lines[i][1].append(
+                            Vec2d(event.pos[0], event.pos[1]),
+                            Vec2d(random.random()*2, random.random()*2)
+                            )
+                        self.lines[i][0].append(
+                            Vec2d(event.pos[0], event.pos[1]),
+                            Vec2d(random.random()*2, random.random()*2)
+                            )
+                    self.flag = False
+                else:
+                    self.lines[self.n][1].append(
+                        Vec2d(event.pos[0], event.pos[1]),
+                        Vec2d(random.random()*2, random.random()*2)
+                        )
+                    self.lines[self.n][0].append(
+                        Vec2d(event.pos[0], event.pos[1]),
+                        Vec2d(random.random()*2, random.random()*2)
+                        )
+
+    def _draw_help(self):
+        gameDisplay.fill((50, 50, 50))
+        font1 = pygame.font.SysFont("courier", 24)
+        font2 = pygame.font.SysFont("serif", 24)
+        data = []
+        data.append(["TAB", "Show Help"])
+        data.append(["R", "Restart"])
+        data.append(["P", "Pause/Play"])
+        data.append(["SPACE", "Create a new curve"])
+        data.append(["1", "More points"])
+        data.append(["0", "Less points"])
+        data.append(["W", "Faster"])
+        data.append(["S", "Slower"])
+        data.append([str(self.steps), "Current points"])
+        data.append([str(self.n+1), "Current Polylines"])
+        pygame.draw.lines(gameDisplay, (255, 50, 50, 255), True,
+                        [(0, 0), (800, 0), (800, 600), (0, 600)], 5)
+        for i, text in enumerate(data):
+            gameDisplay.blit(font1.render(
+                text[0], True, (128, 128, 255)), (100, 100 + 30 * i))
+            gameDisplay.blit(font2.render(
+                text[1], True, (128, 128, 255)), (200, 100 + 30 * i))
+
+
+if __name__ == "__main__":
+    SCREEN_DIM = (800, 600)
+    pygame.init()
+    pygame.display.set_caption("MyScreenSaver")
+    gameDisplay = pygame.display.set_mode(SCREEN_DIM)
+    PygameWindow().run()
+    exit(0)
