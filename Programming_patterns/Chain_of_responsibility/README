@@ -1,0 +1,13 @@
+  EventGet(<type>) создаёт событие получения данных соответствующего типа
+  EventSet(<value>) создаёт событие изменения поля типа type(<value>)
+
+  Классы NullHandler, IntHandler, FloatHandler, StrHandler так, могут создать цепочку:
+
+    chain = IntHandler(FloatHandler(StrHandler(NullHandler())))
+    chain.handle(obj, EventGet(int)) — вернуть значение obj.integer_field
+    chain.handle(obj, EventGet(str)) — вернуть значение obj.string_field
+    chain.handle(obj, EventGet(float)) — вернуть значение obj.float_field
+    chain.handle(obj, EventSet(1)) — установить значение obj.integer_field =1
+    chain.handle(obj, EventSet(1.1)) — установить значение obj.float_field = 1.1
+    chain.handle(obj, EventSet("str")) — установить значение obj.string_field = "str"
+    
