@@ -53,7 +53,7 @@ class Graf:
         return way
 
 
-# Вспомогательная функция, её наличие не обязательно и не будет проверяться
+# Вспомогательная функция
 def build_tree(start, end, path):
     link_re = re.compile(r"(?<=/wiki/)[\w()]+")  # Искать ссылки можно как угодно, не обязательно через re
     files = dict.fromkeys(os.listdir(path))  # Словарь вида {"filename1": None, "filename2": None, ...}
@@ -66,7 +66,7 @@ def build_tree(start, end, path):
     return files
 
 
-# Вспомогательная функция, её наличие не обязательно и не будет проверяться
+# Вспомогательная функция
 def build_bridge(start, end, path):
     files = build_tree(start, end, path)
     graf = Graf(files)
@@ -75,8 +75,7 @@ def build_bridge(start, end, path):
 
 
 def parse(start, end, path):
-    bridge = build_bridge(start, end, path)  # Искать список страниц можно как угодно, даже так: bridge = [end, start]
-    # Когда есть список страниц, из них нужно вытащить данные и вернуть их
+    bridge = build_bridge(start, end, path)
     out = {}
     for file in bridge:
         imgs = 0
